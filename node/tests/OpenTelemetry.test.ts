@@ -724,6 +724,19 @@ describe("OpenTelemetry parent span context propagation", () => {
             // Ensure 100% sampling so all commands produce spans
             OpenTelemetry.setSamplePercentage(100);
 
+            // Drain any stale spans from previous test suites.
+            // The OTel batch exporter flushes every 100ms, so waiting 200ms
+            // ensures pending spans are written, then we delete the file.
+            if (fs.existsSync(VALID_ENDPOINT_TRACES)) {
+                fs.unlinkSync(VALID_ENDPOINT_TRACES);
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 200));
+
+            if (fs.existsSync(VALID_ENDPOINT_TRACES)) {
+                fs.unlinkSync(VALID_ENDPOINT_TRACES);
+            }
+
             client = await GlideClusterClient.createClient({
                 ...getClientConfigurationOption(
                     cluster.getAddresses(),
