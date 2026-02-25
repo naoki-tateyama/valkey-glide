@@ -701,7 +701,6 @@ describe("OpenTelemetry GlideSpanContext propagation", () => {
 
 // Integration test for parent span context propagation
 describe("OpenTelemetry parent span context propagation", () => {
-    const testsFailed = 0;
     let cluster: ValkeyCluster;
     let client: GlideClusterClient;
 
@@ -727,11 +726,7 @@ describe("OpenTelemetry parent span context propagation", () => {
     });
 
     afterAll(async () => {
-        if (testsFailed === 0) {
-            await cluster.close();
-        } else {
-            await cluster.close(true);
-        }
+        await cluster.close();
     });
 
     it(
