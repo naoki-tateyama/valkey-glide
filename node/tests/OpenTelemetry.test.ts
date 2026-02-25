@@ -636,6 +636,33 @@ describe("OpenTelemetry GlideSpanContext propagation", () => {
         expect(OpenTelemetry.getParentSpanContext()).toEqual(ctx);
     });
 
+    it("getParentSpanContext returns context with traceState", () => {
+        const ctx: GlideSpanContext = {
+            traceId: "0af7651916cd43dd8448eb211c80319c",
+            spanId: "b7ad6b7169203331",
+            traceFlags: 1,
+            traceState: "vendorname1=opaqueValue1,vendorname2=opaqueValue2",
+        };
+        OpenTelemetry.setParentSpanContextProvider(() => ctx);
+        const result = OpenTelemetry.getParentSpanContext();
+        expect(result).toEqual(ctx);
+        expect(result?.traceState).toBe(
+            "vendorname1=opaqueValue1,vendorname2=opaqueValue2",
+        );
+    });
+
+    it("getParentSpanContext returns context when traceState is omitted", () => {
+        const ctx: GlideSpanContext = {
+            traceId: "0af7651916cd43dd8448eb211c80319c",
+            spanId: "b7ad6b7169203331",
+            traceFlags: 1,
+        };
+        OpenTelemetry.setParentSpanContextProvider(() => ctx);
+        const result = OpenTelemetry.getParentSpanContext();
+        expect(result).toBeDefined();
+        expect(result?.traceState).toBeUndefined();
+    });
+
     it("getParentSpanContext returns undefined when callback returns undefined", () => {
         OpenTelemetry.setParentSpanContextProvider(() => undefined);
         expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();

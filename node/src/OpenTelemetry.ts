@@ -22,6 +22,8 @@ export interface GlideSpanContext {
     spanId: string;
     /** Trace flags (e.g., 1 for sampled). */
     traceFlags: number;
+    /** Optional W3C trace state (e.g., "vendorname1=opaqueValue1,vendorname2=opaqueValue2"). */
+    traceState?: string;
 }
 
 /**
@@ -59,7 +61,8 @@ export interface GlideSpanContext {
 export class OpenTelemetry {
     private static _instance: OpenTelemetry | null = null;
     private static openTelemetryConfig: OpenTelemetryConfig | null = null;
-    private static spanContextFn: (() => GlideSpanContext | undefined) | null = null;
+    private static spanContextFn: (() => GlideSpanContext | undefined) | null =
+        null;
 
     /**
      * Singleton class for managing OpenTelemetry configuration and operations.
@@ -198,6 +201,7 @@ export class OpenTelemetry {
      *         traceId: ctx.traceId,
      *         spanId: ctx.spanId,
      *         traceFlags: ctx.traceFlags,
+     *         traceState: ctx.traceState?.toString(),
      *     };
      * });
      * ```

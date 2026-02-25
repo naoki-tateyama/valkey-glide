@@ -14,6 +14,7 @@ use opentelemetry_sdk::runtime::Tokio;
 use opentelemetry_sdk::trace::{BatchConfig, BatchSpanProcessor, TracerProvider};
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
+use std::str::FromStr;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock, RwLock};
@@ -251,18 +252,25 @@ impl GlideSpanInner {
         trace_id_hex: &str,
         span_id_hex: &str,
         trace_flags: u8,
+        trace_state: Option<&str>,
     ) -> Result<Self, TraceError> {
         let trace_id = TraceId::from_hex(trace_id_hex)
             .map_err(|_| TraceError::from(format!("Invalid trace_id hex: {trace_id_hex}")))?;
         let span_id = SpanId::from_hex(span_id_hex)
             .map_err(|_| TraceError::from(format!("Invalid span_id hex: {span_id_hex}")))?;
 
+        let trace_state = match trace_state {
+            Some(s) => TraceState::from_str(s)
+                .map_err(|_| TraceError::from(format!("Invalid trace_state: {s}")))?,
+            None => TraceState::default(),
+        };
+
         let remote_span_context = SpanContext::new(
             trace_id,
             span_id,
             TraceFlags::new(trace_flags),
             true, // is_remote
-            TraceState::default(),
+            trace_state,
         );
 
         let parent_context =
@@ -398,6 +406,7 @@ impl GlideSpan {
         trace_id_hex: &str,
         span_id_hex: &str,
         trace_flags: u8,
+        trace_state: Option<&str>,
     ) -> Result<Self, TraceError> {
         Ok(GlideSpan {
             inner: GlideSpanInner::new_with_remote_context(
@@ -405,6 +414,7 @@ impl GlideSpan {
                 trace_id_hex,
                 span_id_hex,
                 trace_flags,
+                trace_state,
             )?,
         })
     }

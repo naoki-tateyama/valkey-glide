@@ -1360,6 +1360,7 @@ export class BaseClient {
                           parentCtx.traceId,
                           parentCtx.spanId,
                           parentCtx.traceFlags,
+                          parentCtx.traceState,
                       )
                     : createLeakedOtelSpan(commandName);
                 spanPtr = new Long(pair[0], pair[1]);

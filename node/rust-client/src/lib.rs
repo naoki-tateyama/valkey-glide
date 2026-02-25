@@ -576,8 +576,15 @@ pub fn create_otel_span_with_trace_context(
     trace_id: String,
     span_id: String,
     trace_flags: u8,
+    trace_state: Option<String>,
 ) -> [u32; 2] {
-    let span = match GlideSpan::new_with_remote_context(&name, &trace_id, &span_id, trace_flags) {
+    let span = match GlideSpan::new_with_remote_context(
+        &name,
+        &trace_id,
+        &span_id,
+        trace_flags,
+        trace_state.as_deref(),
+    ) {
         Ok(s) => s,
         Err(e) => {
             log(
