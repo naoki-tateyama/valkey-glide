@@ -801,6 +801,8 @@ describe("OpenTelemetry parent span context propagation", () => {
                 if (spanJson.name === "Set" || spanJson.name === "Get") {
                     expect(spanJson.trace_id).toBe(parentTraceId);
                     expect(spanJson.parent_span_id).toBe(parentSpanId);
+                    expect(spanJson.span_id).toBeDefined();
+                    expect(spanJson.span_id).not.toBe(parentSpanId);
                 }
             }
         },
