@@ -1353,7 +1353,7 @@ export class BaseClient {
                     command instanceof command_request.Command
                         ? command_request.RequestType[command.requestType]
                         : "Batch";
-                const parentCtx = OpenTelemetry.getSpanFromContext();
+                const parentCtx = OpenTelemetry.getParentSpanContext();
                 const pair = parentCtx
                     ? createOtelSpanWithTraceContext(
                           commandName,

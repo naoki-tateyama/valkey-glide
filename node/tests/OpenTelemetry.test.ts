@@ -12,7 +12,7 @@ import {
     OpenTelemetry,
     OpenTelemetryConfig,
     ProtocolVersion,
-    SpanContext,
+    GlideSpanContext,
 } from "../build-ts";
 import {
     flushAndCloseClient,
@@ -615,48 +615,48 @@ describe("OpenTelemetry GlideClient", () => {
     );
 });
 
-// Unit tests for setSpanFromContext / getSpanFromContext API
-describe("OpenTelemetry SpanContext propagation", () => {
+// Unit tests for setParentSpanContextProvider / getParentSpanContext API
+describe("OpenTelemetry GlideSpanContext propagation", () => {
     afterEach(() => {
         // Reset the callback after each test
-        OpenTelemetry.setSpanFromContext(null);
+        OpenTelemetry.setParentSpanContextProvider(null);
     });
 
-    it("getSpanFromContext returns undefined when no callback is set", () => {
-        expect(OpenTelemetry.getSpanFromContext()).toBeUndefined();
+    it("getParentSpanContext returns undefined when no callback is set", () => {
+        expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();
     });
 
-    it("getSpanFromContext returns the value from the registered callback", () => {
-        const ctx: SpanContext = {
+    it("getParentSpanContext returns the value from the registered callback", () => {
+        const ctx: GlideSpanContext = {
             traceId: "0af7651916cd43dd8448eb211c80319c",
             spanId: "b7ad6b7169203331",
             traceFlags: 1,
         };
-        OpenTelemetry.setSpanFromContext(() => ctx);
-        expect(OpenTelemetry.getSpanFromContext()).toEqual(ctx);
+        OpenTelemetry.setParentSpanContextProvider(() => ctx);
+        expect(OpenTelemetry.getParentSpanContext()).toEqual(ctx);
     });
 
-    it("getSpanFromContext returns undefined when callback returns undefined", () => {
-        OpenTelemetry.setSpanFromContext(() => undefined);
-        expect(OpenTelemetry.getSpanFromContext()).toBeUndefined();
+    it("getParentSpanContext returns undefined when callback returns undefined", () => {
+        OpenTelemetry.setParentSpanContextProvider(() => undefined);
+        expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();
     });
 
-    it("setSpanFromContext(null) clears a previously set callback", () => {
-        const ctx: SpanContext = {
+    it("setParentSpanContextProvider(null) clears a previously set callback", () => {
+        const ctx: GlideSpanContext = {
             traceId: "0af7651916cd43dd8448eb211c80319c",
             spanId: "b7ad6b7169203331",
             traceFlags: 1,
         };
-        OpenTelemetry.setSpanFromContext(() => ctx);
-        expect(OpenTelemetry.getSpanFromContext()).toEqual(ctx);
+        OpenTelemetry.setParentSpanContextProvider(() => ctx);
+        expect(OpenTelemetry.getParentSpanContext()).toEqual(ctx);
 
-        OpenTelemetry.setSpanFromContext(null);
-        expect(OpenTelemetry.getSpanFromContext()).toBeUndefined();
+        OpenTelemetry.setParentSpanContextProvider(null);
+        expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();
     });
 
-    it("callback is invoked on each call to getSpanFromContext", () => {
+    it("callback is invoked on each call to getParentSpanContext", () => {
         let callCount = 0;
-        OpenTelemetry.setSpanFromContext(() => {
+        OpenTelemetry.setParentSpanContextProvider(() => {
             callCount++;
             return {
                 traceId: "0af7651916cd43dd8448eb211c80319c",
@@ -665,9 +665,9 @@ describe("OpenTelemetry SpanContext propagation", () => {
             };
         });
 
-        OpenTelemetry.getSpanFromContext();
-        OpenTelemetry.getSpanFromContext();
-        OpenTelemetry.getSpanFromContext();
+        OpenTelemetry.getParentSpanContext();
+        OpenTelemetry.getParentSpanContext();
+        OpenTelemetry.getParentSpanContext();
         expect(callCount).toBe(3);
     });
 });
@@ -690,7 +690,7 @@ describe("OpenTelemetry parent span context propagation", () => {
     }, 40000);
 
     afterEach(async () => {
-        OpenTelemetry.setSpanFromContext(null);
+        OpenTelemetry.setParentSpanContextProvider(null);
 
         if (fs.existsSync(VALID_ENDPOINT_TRACES)) {
             fs.unlinkSync(VALID_ENDPOINT_TRACES);
@@ -715,7 +715,7 @@ describe("OpenTelemetry parent span context propagation", () => {
             const parentSpanId = "b7ad6b7169203331";
             const parentTraceFlags = 1;
 
-            OpenTelemetry.setSpanFromContext(() => ({
+            OpenTelemetry.setParentSpanContextProvider(() => ({
                 traceId: parentTraceId,
                 spanId: parentSpanId,
                 traceFlags: parentTraceFlags,

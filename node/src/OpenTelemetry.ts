@@ -15,7 +15,7 @@ import {
  * When a user's application has an active OTel span (e.g., from an HTTP request handler),
  * this context allows GLIDE command spans to appear as children of that span in tracing UIs.
  */
-export interface SpanContext {
+export interface GlideSpanContext {
     /** The trace ID as a 32-character lowercase hex string. */
     traceId: string;
     /** The span ID as a 16-character lowercase hex string. */
@@ -59,7 +59,7 @@ export interface SpanContext {
 export class OpenTelemetry {
     private static _instance: OpenTelemetry | null = null;
     private static openTelemetryConfig: OpenTelemetryConfig | null = null;
-    private static spanContextFn: (() => SpanContext | undefined) | null = null;
+    private static spanContextFn: (() => GlideSpanContext | undefined) | null = null;
 
     /**
      * Singleton class for managing OpenTelemetry configuration and operations.
@@ -178,17 +178,17 @@ export class OpenTelemetry {
      * Register a callback that returns the active parent span context for each command.
      *
      * The callback is invoked before each GLIDE command to retrieve the current trace context.
-     * When a `SpanContext` is returned, the GLIDE command span will be created as a child of
+     * When a `GlideSpanContext` is returned, the GLIDE command span will be created as a child of
      * that context, enabling end-to-end distributed tracing.
      *
-     * @param fn - A function that returns a `SpanContext` or `undefined`. Return `undefined`
+     * @param fn - A function that returns a `GlideSpanContext` or `undefined`. Return `undefined`
      *   when there is no active span context (GLIDE will create a standalone span).
      *
      * @example
      * ```typescript
      * import { trace } from "@opentelemetry/api";
      *
-     * OpenTelemetry.setSpanFromContext(() => {
+     * OpenTelemetry.setParentSpanContextProvider(() => {
      *     const activeSpan = trace.getActiveSpan();
      *     if (!activeSpan) return undefined;
      *     const ctx = activeSpan.spanContext();
@@ -200,8 +200,8 @@ export class OpenTelemetry {
      * });
      * ```
      */
-    public static setSpanFromContext(
-        fn: (() => SpanContext | undefined) | null,
+    public static setParentSpanContextProvider(
+        fn: (() => GlideSpanContext | undefined) | null,
     ) {
         this.spanContextFn = fn;
     }
@@ -209,11 +209,11 @@ export class OpenTelemetry {
     /**
      * Retrieve the current parent span context by invoking the registered callback.
      *
-     * @returns The `SpanContext` from the registered callback, or `undefined` if no callback
+     * @returns The `GlideSpanContext` from the registered callback, or `undefined` if no callback
      *   is set or the callback returns `undefined`.
      * @internal
      */
-    public static getSpanFromContext(): SpanContext | undefined {
+    public static getParentSpanContext(): GlideSpanContext | undefined {
         return this.spanContextFn?.();
     }
 }
