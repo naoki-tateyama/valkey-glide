@@ -697,6 +697,61 @@ describe("OpenTelemetry GlideSpanContext propagation", () => {
         OpenTelemetry.getParentSpanContext();
         expect(callCount).toBe(3);
     });
+
+    it("getParentSpanContext returns undefined for invalid traceId", () => {
+        OpenTelemetry.setParentSpanContextProvider(() => ({
+            traceId: "not-a-valid-hex",
+            spanId: "b7ad6b7169203331",
+            traceFlags: 1,
+        }));
+        expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();
+    });
+
+    it("getParentSpanContext returns undefined for invalid spanId", () => {
+        OpenTelemetry.setParentSpanContextProvider(() => ({
+            traceId: "0af7651916cd43dd8448eb211c80319c",
+            spanId: "tooshort",
+            traceFlags: 1,
+        }));
+        expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();
+    });
+
+    it("getParentSpanContext returns undefined for uppercase hex", () => {
+        OpenTelemetry.setParentSpanContextProvider(() => ({
+            traceId: "0AF7651916CD43DD8448EB211C80319C",
+            spanId: "B7AD6B7169203331",
+            traceFlags: 1,
+        }));
+        expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();
+    });
+
+    it("getParentSpanContext returns valid context for correct hex", () => {
+        const ctx: GlideSpanContext = {
+            traceId: "0af7651916cd43dd8448eb211c80319c",
+            spanId: "b7ad6b7169203331",
+            traceFlags: 1,
+        };
+        OpenTelemetry.setParentSpanContextProvider(() => ctx);
+        expect(OpenTelemetry.getParentSpanContext()).toEqual(ctx);
+    });
+
+    it("getParentSpanContext returns undefined for too-short traceId", () => {
+        OpenTelemetry.setParentSpanContextProvider(() => ({
+            traceId: "0af7651916cd43dd",
+            spanId: "b7ad6b7169203331",
+            traceFlags: 1,
+        }));
+        expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();
+    });
+
+    it("getParentSpanContext returns undefined for too-long spanId", () => {
+        OpenTelemetry.setParentSpanContextProvider(() => ({
+            traceId: "0af7651916cd43dd8448eb211c80319c",
+            spanId: "b7ad6b716920333100",
+            traceFlags: 1,
+        }));
+        expect(OpenTelemetry.getParentSpanContext()).toBeUndefined();
+    });
 });
 
 // Integration test for parent span context propagation

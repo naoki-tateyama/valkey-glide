@@ -220,6 +220,33 @@ export class OpenTelemetry {
      * @internal
      */
     public static getParentSpanContext(): GlideSpanContext | undefined {
-        return this.spanContextFn?.();
+        const ctx = this.spanContextFn?.();
+
+        if (ctx === undefined) {
+            return undefined;
+        }
+
+        const TRACE_ID_REGEX = /^[0-9a-f]{32}$/;
+        const SPAN_ID_REGEX = /^[0-9a-f]{16}$/;
+
+        if (!TRACE_ID_REGEX.test(ctx.traceId)) {
+            Logger.log(
+                "warn",
+                "GlideOpenTelemetry",
+                `Invalid traceId "${ctx.traceId}" — expected 32 lowercase hex chars. Falling back to standalone span.`,
+            );
+            return undefined;
+        }
+
+        if (!SPAN_ID_REGEX.test(ctx.spanId)) {
+            Logger.log(
+                "warn",
+                "GlideOpenTelemetry",
+                `Invalid spanId "${ctx.spanId}" — expected 16 lowercase hex chars. Falling back to standalone span.`,
+            );
+            return undefined;
+        }
+
+        return ctx;
     }
 }
