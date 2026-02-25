@@ -177,7 +177,9 @@ export class OpenTelemetry {
     /**
      * Register a callback that returns the active parent span context for each command.
      *
-     * The callback is invoked before each GLIDE command to retrieve the current trace context.
+     * Note: This callback is invoked synchronously before each sampled command. Keep the
+     * implementation lightweight — avoid I/O, async work, or expensive computation.
+     *
      * When a `GlideSpanContext` is returned, the GLIDE command span will be created as a child of
      * that context, enabling end-to-end distributed tracing.
      *
