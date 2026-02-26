@@ -10,6 +10,45 @@ import {
 } from ".";
 
 /**
+ * Extended OpenTelemetry configuration that includes JS-side options
+ * not representable in the native (NAPI) config.
+ *
+ * Pass this to {@link OpenTelemetry.init} instead of the plain `OpenTelemetryConfig`.
+ */
+export interface GlideOpenTelemetryConfig extends OpenTelemetryConfig {
+    /**
+     * Optional callback that returns the active parent span context for each command.
+     *
+     * When a {@link GlideSpanContext} is returned, the GLIDE command span will be created
+     * as a child of that context, enabling end-to-end distributed tracing.
+     *
+     * The callback is invoked synchronously before each sampled command. Keep the
+     * implementation lightweight — avoid I/O, async work, or expensive computation.
+     *
+     * @example
+     * ```typescript
+     * import { trace } from "@opentelemetry/api";
+     *
+     * OpenTelemetry.init({
+     *     traces: { endpoint: "http://localhost:4318/v1/traces" },
+     *     parentSpanContextProvider: () => {
+     *         const span = trace.getActiveSpan();
+     *         if (!span) return undefined;
+     *         const ctx = span.spanContext();
+     *         return {
+     *             traceId: ctx.traceId,
+     *             spanId: ctx.spanId,
+     *             traceFlags: ctx.traceFlags,
+     *             traceState: ctx.traceState?.toString(),
+     *         };
+     *     },
+     * });
+     * ```
+     */
+    parentSpanContextProvider?: () => GlideSpanContext | undefined;
+}
+
+/**
  * Represents the trace context of a remote span, used for parent span context propagation.
  *
  * When a user's application has an active OTel span (e.g., from an HTTP request handler),
@@ -31,7 +70,7 @@ export interface GlideSpanContext {
  * If you need to change configuration, restart the process with new settings.
  * ### OpenTelemetry
  *
- * - **openTelemetryConfig**: Use this object to configure OpenTelemetry exporters and options.
+ * - **openTelemetryConfig**: Use {@link GlideOpenTelemetryConfig} to configure OpenTelemetry exporters and options.
  *   - **traces**: (optional) Configure trace exporting.
  *     - **endpoint**: The collector endpoint for traces. Supported protocols:
  *       - `http://` or `https://` for HTTP/HTTPS
@@ -43,6 +82,7 @@ export interface GlideSpanContext {
  *   - **metrics**: (optional) Configure metrics exporting.
  *     - **endpoint**: The collector endpoint for metrics. Same protocol rules as above.
  *   - **flushIntervalMs**: (optional) Interval in milliseconds for flushing data to the collector. Must be a positive integer. Defaults to 5000ms if not specified.
+ *   - **parentSpanContextProvider**: (optional) Callback returning the active parent span context. See {@link GlideOpenTelemetryConfig.parentSpanContextProvider}.
  *
  * #### File Exporter Details
  * - For `file://` endpoints:
@@ -71,23 +111,26 @@ export class OpenTelemetry {
      *
      * Example usage:
      * ```typescript
-     * import { OpenTelemetry, OpenTelemetryConfig, OpenTelemetryTracesConfig, OpenTelemetryMetricsConfig } from "@valkey/valkey-glide";
+     * import { OpenTelemetry, GlideOpenTelemetryConfig } from "@valkey/valkey-glide";
+     * import { trace } from "@opentelemetry/api";
      *
-     * let tracesConfig: OpenTelemetryTracesConfig = {
-     *  endpoint: "http://localhost:4318/v1/traces",
-     *  samplePercentage: 10, // Optional, defaults to 1. Can also be changed at runtime via setSamplePercentage().
-     * };
-     * let metricsConfig: OpenTelemetryMetricsConfig = {
-     *  endpoint: "http://localhost:4318/v1/metrics",
-     * };
-
-     * let config : OpenTelemetryConfig = { 
-     *  traces: tracesConfig,
-     *  metrics: metricsConfig,
-     *  flushIntervalMs: 1000, // Optional, defaults to 5000
+     * const config: GlideOpenTelemetryConfig = {
+     *     traces: {
+     *         endpoint: "http://localhost:4318/v1/traces",
+     *         samplePercentage: 10,
+     *     },
+     *     metrics: {
+     *         endpoint: "http://localhost:4318/v1/metrics",
+     *     },
+     *     flushIntervalMs: 1000,
+     *     parentSpanContextProvider: () => {
+     *         const span = trace.getActiveSpan();
+     *         if (!span) return undefined;
+     *         const ctx = span.spanContext();
+     *         return { traceId: ctx.traceId, spanId: ctx.spanId, traceFlags: ctx.traceFlags };
+     *     },
      * };
      * OpenTelemetry.init(config);
-     * 
      * ```
      *
      * @remarks
@@ -98,7 +141,7 @@ export class OpenTelemetry {
      * Initialize the OpenTelemetry instance
      * @param openTelemetryConfig - The OpenTelemetry configuration
      */
-    public static init(openTelemetryConfig: OpenTelemetryConfig) {
+    public static init(openTelemetryConfig: GlideOpenTelemetryConfig) {
         if (!this._instance) {
             this.internalInit(openTelemetryConfig);
             Logger.log(
@@ -117,9 +160,16 @@ export class OpenTelemetry {
         );
     }
 
-    private static internalInit(openTelemetryConfig: OpenTelemetryConfig) {
-        this.openTelemetryConfig = openTelemetryConfig;
-        InitOpenTelemetry(openTelemetryConfig);
+    private static internalInit(openTelemetryConfig: GlideOpenTelemetryConfig) {
+        const { parentSpanContextProvider, ...nativeConfig } =
+            openTelemetryConfig;
+        this.openTelemetryConfig = nativeConfig;
+
+        if (parentSpanContextProvider) {
+            this.spanContextFn = parentSpanContextProvider;
+        }
+
+        InitOpenTelemetry(nativeConfig);
         this._instance = new OpenTelemetry();
     }
 
@@ -175,41 +225,6 @@ export class OpenTelemetry {
         }
 
         this.openTelemetryConfig.traces.samplePercentage = percentage;
-    }
-
-    /**
-     * Register a callback that returns the active parent span context for each command.
-     *
-     * Note: This callback is invoked synchronously before each sampled command. Keep the
-     * implementation lightweight — avoid I/O, async work, or expensive computation.
-     *
-     * When a `GlideSpanContext` is returned, the GLIDE command span will be created as a child of
-     * that context, enabling end-to-end distributed tracing.
-     *
-     * @param fn - A function that returns a `GlideSpanContext` or `undefined`. Return `undefined`
-     *   when there is no active span context (GLIDE will create a standalone span).
-     *
-     * @example
-     * ```typescript
-     * import { trace } from "@opentelemetry/api";
-     *
-     * OpenTelemetry.setParentSpanContextProvider(() => {
-     *     const activeSpan = trace.getActiveSpan();
-     *     if (!activeSpan) return undefined;
-     *     const ctx = activeSpan.spanContext();
-     *     return {
-     *         traceId: ctx.traceId,
-     *         spanId: ctx.spanId,
-     *         traceFlags: ctx.traceFlags,
-     *         traceState: ctx.traceState?.toString(),
-     *     };
-     * });
-     * ```
-     */
-    public static setParentSpanContextProvider(
-        fn: (() => GlideSpanContext | undefined) | null,
-    ) {
-        this.spanContextFn = fn;
     }
 
     /**
