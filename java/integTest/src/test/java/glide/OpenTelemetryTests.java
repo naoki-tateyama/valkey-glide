@@ -8,6 +8,7 @@ import glide.api.GlideClusterClient;
 import glide.api.OpenTelemetry;
 import glide.api.OpenTelemetry.OpenTelemetryConfig;
 import glide.api.models.ClusterBatch;
+import glide.api.models.Script;
 import glide.api.models.configuration.ProtocolVersion;
 import java.io.File;
 import java.nio.file.Files;
@@ -456,6 +457,26 @@ public class OpenTelemetryTests {
         assertTrue(
                 endMemory < startMemory * 1.1,
                 "Memory usage increased too much: " + startMemory + " -> " + endMemory);
+    }
+
+    @ParameterizedTest
+    @MethodSource("getClientsProtocolVersion")
+    @SneakyThrows
+    public void testSpanScriptInvocation(ProtocolVersion protocol) {
+        client =
+                GlideClusterClient.createClient(
+                                commonClusterClientConfig().requestTimeout(10000).protocol(protocol).build())
+                        .get();
+
+        try (Script script = new Script("return 'Hello'", false)) {
+            Object result = client.invokeScript(script).get();
+            assertEquals("Hello", result);
+        }
+
+        // Wait for spans to be flushed with retry logic
+        SpanFileData spanData = waitForSpansWithRetry(VALID_ENDPOINT_TRACES, 1, "EVALSHA", 10000);
+
+        assertTrue(spanData.spanNames.contains("EVALSHA"));
     }
 
     @Test

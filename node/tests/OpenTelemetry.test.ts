@@ -14,6 +14,7 @@ import {
     ProtocolVersion,
     GlideSpanContext,
     GlideOpenTelemetryConfig,
+    Script,
 } from "../build-ts";
 import {
     flushAndCloseClient,
@@ -498,6 +499,32 @@ describe("OpenTelemetry GlideClusterClient", () => {
             const endMemory = process.memoryUsage().heapUsed;
 
             expect(endMemory).toBeLessThan(startMemory * 1.1); // Allow 10% growth
+        },
+        TIMEOUT,
+    );
+
+    it.each([ProtocolVersion.RESP2, ProtocolVersion.RESP3])(
+        `GlideClusterClient test span script invocation_%p`,
+        async (protocol) => {
+            client = await GlideClusterClient.createClient({
+                ...getClientConfigurationOption(
+                    cluster.getAddresses(),
+                    protocol,
+                ),
+            });
+
+            const script = new Script(Buffer.from("return 'Hello'"));
+            const result = await client.invokeScript(script);
+            expect(result).toEqual("Hello");
+
+            // Wait for spans to be flushed to file
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+
+            // Read and check span names from the file using the helper function
+            const { spanNames } = readAndParseSpanFile(VALID_ENDPOINT_TRACES);
+
+            // Check for expected EVALSHA span
+            expect(spanNames).toContain("EVALSHA");
         },
         TIMEOUT,
     );

@@ -12,6 +12,7 @@ from glide import (
     OpenTelemetryConfig,
     OpenTelemetryMetricsConfig,
     OpenTelemetryTracesConfig,
+    Script,
 )
 from glide.opentelemetry import OpenTelemetry
 from glide_shared.commands.batch import Batch, ClusterBatch
@@ -558,6 +559,33 @@ class TestOpenTelemetryGlide:
         assert (
             memory_increase < 10
         ), f"Memory usage increased by {memory_increase: .2f}%, which is more than the allowed 10%"
+
+    @pytest.mark.parametrize("cluster_mode", [True, False])
+    @pytest.mark.parametrize("protocol", [ProtocolVersion.RESP2, ProtocolVersion.RESP3])
+    async def test_span_script_invocation(self, request, protocol, cluster_mode):
+        """Test that script invocation creates an EVALSHA span"""
+        client = await create_client(
+            request,
+            cluster_mode=cluster_mode,
+            protocol=protocol,
+        )
+
+        script = Script("return 'Hello'")
+        result = await client.invoke_script(script)
+        assert result == b"Hello"
+
+        # Wait for spans to be flushed
+        await wait_for_spans_to_be_flushed(
+            VALID_ENDPOINT_TRACES, expected_span_names=["EVALSHA"]
+        )
+
+        # Read the span file and check span names
+        _, _, span_names = read_and_parse_span_file(VALID_ENDPOINT_TRACES)
+
+        # Check for expected EVALSHA span
+        assert "EVALSHA" in span_names
+
+        await client.close()
 
     @pytest.mark.parametrize("cluster_mode", [True, False])
     @pytest.mark.parametrize("protocol", [ProtocolVersion.RESP2, ProtocolVersion.RESP3])
