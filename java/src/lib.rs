@@ -1752,6 +1752,7 @@ pub extern "system" fn Java_glide_internal_GlideNativeBridge_executeScriptAsync(
     route_type: jint,
     route_param: JString,
     expect_utf8: jni::sys::jboolean,
+    span_ptr: jlong,
 ) {
     run_ffi(|| {
         let Some(jvm) = get_jvm_or_complete_error(&mut env, callback_id, "executeScriptAsync")
@@ -1872,6 +1873,8 @@ pub extern "system" fn Java_glide_internal_GlideNativeBridge_executeScriptAsync(
             None
         };
 
+        let span_ptr_u64 = span_ptr as u64;
+
         // Spawn async task for script execution using FFI-imported patterns
         let runtime = get_runtime();
         runtime.spawn(async move {
@@ -1978,6 +1981,28 @@ pub extern "system" fn Java_glide_internal_GlideNativeBridge_executeScriptAsync(
                         }
                     };
 
+                    // Set OTel DB attributes on span if present
+                    let otel_span = if span_ptr_u64 != 0 {
+                        unsafe {
+                            glide_core::GlideOpenTelemetry::span_from_pointer(span_ptr_u64).ok()
+                        }
+                    } else {
+                        None
+                    };
+                    if let Some(ref span) = otel_span {
+                        let keys_slices: Vec<&[u8]> =
+                            keys_data.iter().map(|k| k.as_slice()).collect();
+                        let args_slices: Vec<&[u8]> =
+                            args_data.iter().map(|a| a.as_slice()).collect();
+                        glide_core::otel_db_semantics::set_db_script_attributes(
+                            span,
+                            &hash_str,
+                            &keys_slices,
+                            &args_slices,
+                            &client,
+                        );
+                    }
+
                     let result = client
                         .invoke_script(
                             &hash_str,
@@ -1993,6 +2018,9 @@ pub extern "system" fn Java_glide_internal_GlideNativeBridge_executeScriptAsync(
                                 e.to_string(),
                             ))
                         });
+
+                    // Drop the span to finalize it
+                    drop(otel_span);
 
                     let binary_mode = expect_utf8 == 0;
                     complete_callback(jvm, callback_id, result, binary_mode);

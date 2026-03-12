@@ -5,6 +5,8 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import glide.api.BaseClient;
 import glide.api.logging.Logger;
 import glide.ffi.resolvers.NativeUtils;
+import glide.ffi.resolvers.OpenTelemetryResolver;
+import glide.managers.OpenTelemetry;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
@@ -438,6 +440,11 @@ public class GlideCoreClient implements AutoCloseable {
                 return future;
             }
 
+            long spanPtr = 0;
+            if (OpenTelemetry.isInitialized() && OpenTelemetry.shouldSample()) {
+                spanPtr = OpenTelemetryResolver.createLeakedOtelSpan("EVALSHA");
+            }
+
             GlideNativeBridge.executeScriptAsync(
                     handle,
                     correlationId,
@@ -447,7 +454,8 @@ public class GlideCoreClient implements AutoCloseable {
                     hasRoute,
                     routeType,
                     routeParam,
-                    expectUtf8Response);
+                    expectUtf8Response,
+                    spanPtr);
 
             return future;
 

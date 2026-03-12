@@ -1525,6 +1525,22 @@ export class BaseClient {
         this.ensureClientIsOpen();
 
         return new Promise<T>((resolve, reject) => {
+            let spanPtr: Long | null = null;
+
+            if (OpenTelemetry.shouldSample()) {
+                const parentCtx = OpenTelemetry.getParentSpanContext();
+                const pair = parentCtx
+                    ? createOtelSpanWithTraceContext(
+                          "EVALSHA",
+                          parentCtx.traceId,
+                          parentCtx.spanId,
+                          parentCtx.traceFlags,
+                          parentCtx.traceState,
+                      )
+                    : createLeakedOtelSpan("EVALSHA");
+                spanPtr = new Long(pair[0], pair[1]);
+            }
+
             const callbackIdx = this.getCallbackIndex();
             this.promiseCallbackFunctions[callbackIdx] = [
                 resolve,
@@ -1535,6 +1551,7 @@ export class BaseClient {
                 new command_request.CommandRequest({
                     callbackIdx,
                     scriptInvocation: command,
+                    rootSpanPtr: spanPtr,
                 }),
                 (message: command_request.CommandRequest, writer: Writer) => {
                     command_request.CommandRequest.encodeDelimited(
